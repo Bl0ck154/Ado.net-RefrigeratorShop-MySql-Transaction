@@ -15,10 +15,9 @@ namespace Ado.net___HW_4___MySql_Winforms
 	{
 		public static void EnlistTransaction(this MySqlDataAdapter dataAdapter, MySqlTransaction transaction)
 		{
-			MySqlCommandBuilder mySqlCommandBuilder = new MySqlCommandBuilder(dataAdapter);
 			dataAdapter.UpdateCommand.Transaction = transaction;
 			dataAdapter.InsertCommand.Transaction = transaction;
-			dataAdapter.DeleteCommand.Transaction = transaction;
+	//		dataAdapter.DeleteCommand.Transaction = transaction;
 		}
 	}
 	public partial class Form1 : Form
@@ -88,7 +87,7 @@ namespace Ado.net___HW_4___MySql_Winforms
 					}
 					catch (Exception ex)
 					{
-						MessageBox.Show(ex.Message, "1");
+			//			MessageBox.Show(ex.Message, "1");
 					}
 				}
 				try
@@ -102,13 +101,15 @@ namespace Ado.net___HW_4___MySql_Winforms
 				}
 				catch (Exception ex)
 				{
-					MessageBox.Show(ex.Message, "2");
+			//		MessageBox.Show(ex.Message, "2");
 				}
 
 
 				dataSet = new DataSet();
 				dataAdapter = new MySqlDataAdapter("select * from Buyers", sqlConnection);
 				MySqlCommandBuilder mySqlCommandBuilder = new MySqlCommandBuilder(dataAdapter);
+				dataAdapter.UpdateCommand = mySqlCommandBuilder.GetUpdateCommand();
+				dataAdapter.InsertCommand = mySqlCommandBuilder.GetInsertCommand();
 				dataAdapter.Fill(dataSet, "Buyers");
 				dataGridView1.DataSource = dataSet.Tables[0];
 				dataAdapter.SelectCommand = new MySqlCommand("select * from Sellers", sqlConnection);
@@ -149,7 +150,7 @@ namespace Ado.net___HW_4___MySql_Winforms
 			}
 			finally
 			{
-				sqlConnection?.Clone();
+			//	sqlConnection?.Close();
 			}
 		}
 
@@ -175,15 +176,21 @@ namespace Ado.net___HW_4___MySql_Winforms
 					dr[4] = comboBoxProducts.SelectedIndex;
 					dr[5] = count;
 					dr[6] = dataSet.Tables["Goods"].Rows[comboBoxProducts.SelectedIndex][2];
+					
 
-					dr = dataSet.Tables["Buyers"].Rows[comboBoxBuyer.SelectedIndex];
-					dr[2] = (int)dr[2] + 1;
-					dr = dataSet.Tables["Sellers"].Rows[comboBoxSeller.SelectedIndex];
-					dr[2] = (int)dr[2] + 1;
-					dr = dataSet.Tables["Goods"].Rows[comboBoxProducts.SelectedIndex];
-					dr[2] = (int)dr[3] - 1;
+					DataRow dr2 = dataSet.Tables["Buyers"].Rows[comboBoxBuyer.SelectedIndex];
+					dr2[2] = (int)dr2[2]+1;
 
-					dataAdapter.Update(dataSet);
+					DataRow dr3 = dataSet.Tables["Sellers"].Rows[comboBoxSeller.SelectedIndex];
+					dr3[2] = (int)dr3[2] + 1;
+
+					DataRow dr4 = dataSet.Tables["Goods"].Rows[comboBoxProducts.SelectedIndex];
+					dr4[3] = (int)dr4[3] - 1;
+
+					foreach (DataTable item in dataSet.Tables)
+					{
+						dataAdapter.Update(dataSet, item.TableName);
+					}
 
 					mySqlTransaction.Commit();
 				}
