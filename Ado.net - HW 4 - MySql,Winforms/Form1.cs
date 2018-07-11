@@ -11,20 +11,11 @@ using MySql.Data.MySqlClient;
 
 namespace Ado.net___HW_4___MySql_Winforms
 {
-	public static class MyTransaction
-	{
-		public static void EnlistTransaction(this MySqlDataAdapter dataAdapter, MySqlTransaction transaction)
-		{
-			dataAdapter.UpdateCommand.Transaction = transaction;
-			dataAdapter.InsertCommand.Transaction = transaction;
-	//		dataAdapter.DeleteCommand.Transaction = transaction;
-		}
-	}
 	public partial class Form1 : Form
 	{
 		MySqlConnection sqlConnection;
 		DataSet dataSet;
-		MySqlDataAdapter dataAdapter;
+		MySqlDataAdapter dataAdapterBuyers, dataAdapterSellers, dataAdapterGoods, dataAdapterOrders;
 		public Form1()
 		{
 			InitializeComponent();
@@ -103,21 +94,21 @@ namespace Ado.net___HW_4___MySql_Winforms
 				{
 			//		MessageBox.Show(ex.Message, "2");
 				}
-
-
+				
 				dataSet = new DataSet();
-				dataAdapter = new MySqlDataAdapter("select * from Buyers", sqlConnection);
-				MySqlCommandBuilder mySqlCommandBuilder = new MySqlCommandBuilder(dataAdapter);
-				dataAdapter.UpdateCommand = mySqlCommandBuilder.GetUpdateCommand();
-				dataAdapter.InsertCommand = mySqlCommandBuilder.GetInsertCommand();
-				dataAdapter.Fill(dataSet, "Buyers");
+				dataAdapterBuyers = new MySqlDataAdapter("select * from Buyers", sqlConnection);
+				setDataAdapterCommands(dataAdapterBuyers);
+				dataAdapterBuyers.Fill(dataSet, "Buyers");
 				dataGridView1.DataSource = dataSet.Tables[0];
-				dataAdapter.SelectCommand = new MySqlCommand("select * from Sellers", sqlConnection);
-				dataAdapter.Fill(dataSet, "Sellers");
-				dataAdapter.SelectCommand = new MySqlCommand("select * from Goods", sqlConnection);
-				dataAdapter.Fill(dataSet, "Goods");
-				dataAdapter.SelectCommand = new MySqlCommand("select * from Orders", sqlConnection);
-				dataAdapter.Fill(dataSet, "Orders");
+				dataAdapterSellers = new MySqlDataAdapter("select * from Sellers", sqlConnection);
+				setDataAdapterCommands(dataAdapterSellers);
+				dataAdapterSellers.Fill(dataSet, "Sellers");
+				dataAdapterGoods = new MySqlDataAdapter("select * from Goods", sqlConnection);
+				setDataAdapterCommands(dataAdapterGoods);
+				dataAdapterGoods.Fill(dataSet, "Goods");
+				dataAdapterOrders = new MySqlDataAdapter("select * from Orders", sqlConnection);
+				setDataAdapterCommands(dataAdapterOrders);
+				dataAdapterOrders.Fill(dataSet, "Orders");
 
 				foreach (DataTable table in dataSet.Tables)
 				{
@@ -150,54 +141,76 @@ namespace Ado.net___HW_4___MySql_Winforms
 			}
 			finally
 			{
-			//	sqlConnection?.Close();
+				sqlConnection?.Close();
 			}
 		}
-
+		void EnlistTransaction(MySqlDataAdapter dataAdapter, MySqlTransaction transaction)
+		{
+			dataAdapter.UpdateCommand.Transaction = transaction;
+			dataAdapter.InsertCommand.Transaction = transaction;
+			dataAdapter.DeleteCommand.Transaction = transaction;
+		}
+		void setDataAdapterCommands(MySqlDataAdapter dataAdapter)
+		{
+			MySqlCommandBuilder mySqlCommandBuilder = new MySqlCommandBuilder(dataAdapter);
+			dataAdapter.UpdateCommand = mySqlCommandBuilder.GetUpdateCommand();
+			dataAdapter.InsertCommand = mySqlCommandBuilder.GetInsertCommand();
+			dataAdapter.DeleteCommand = mySqlCommandBuilder.GetDeleteCommand();
+		}
 		private void comboBoxTables_SelectedIndexChanged(object sender, EventArgs e)
 		{
 			dataGridView1.DataSource = dataSet.Tables[comboBoxTables.SelectedIndex];
 		}
-
+		void setTransaction(MySqlTransaction mySqlTransaction)
+		{
+			EnlistTransaction(dataAdapterBuyers, mySqlTransaction);
+			EnlistTransaction(dataAdapterSellers,mySqlTransaction);
+			EnlistTransaction(dataAdapterGoods,mySqlTransaction);
+			EnlistTransaction(dataAdapterOrders,mySqlTransaction);
+		}
 		private void button1_Click(object sender, EventArgs e)
 		{
 			try
 			{
+				sqlConnection.Open();
 				using (MySqlTransaction mySqlTransaction = sqlConnection.BeginTransaction())
 				{
-					dataAdapter.EnlistTransaction(mySqlTransaction);
+					setTransaction(mySqlTransaction);
 
 					int count = 1;
 					DataRow dr = dataSet.Tables["Orders"].NewRow();
-					dr[0] = dataSet.Tables["Orders"].Rows.Count;
-					dr[1] = DateTime.Now;
-					dr[2] = dataSet.Tables["Buyers"].Rows[comboBoxBuyer.SelectedIndex][1].ToString();
-					dr[3] = dataSet.Tables["Sellers"].Rows[comboBoxSeller.SelectedIndex][1].ToString();
-					dr[4] = comboBoxProducts.SelectedIndex;
-					dr[5] = count;
-					dr[6] = dataSet.Tables["Goods"].Rows[comboBoxProducts.SelectedIndex][2];
-					
+					dr["id"] = dataSet.Tables["Orders"].Rows.Count;
+					dr["date"] = DateTime.Now;
+					dr["buyerName"] = dataSet.Tables["Buyers"].Rows[comboBoxBuyer.SelectedIndex]["name"].ToString();
+					dr["sellerName"] = dataSet.Tables["Sellers"].Rows[comboBoxSeller.SelectedIndex]["name"].ToString();
+					dr["good_id"] = comboBoxProducts.SelectedIndex;
+					dr["count"] = count;
+					dr["amount"] = (int)dataSet.Tables["Goods"].Rows[comboBoxProducts.SelectedIndex]["price"] * count;
+					dataSet.Tables["Orders"].Rows.Add(dr);
+					dataAdapterOrders.Update(dataSet, "Orders");
 
 					DataRow dr2 = dataSet.Tables["Buyers"].Rows[comboBoxBuyer.SelectedIndex];
 					dr2[2] = (int)dr2[2]+1;
+					dataAdapterBuyers.Update(dataSet, "Buyers");
 
 					DataRow dr3 = dataSet.Tables["Sellers"].Rows[comboBoxSeller.SelectedIndex];
 					dr3[2] = (int)dr3[2] + 1;
+					dataAdapterSellers.Update(dataSet, "Sellers");
 
 					DataRow dr4 = dataSet.Tables["Goods"].Rows[comboBoxProducts.SelectedIndex];
 					dr4[3] = (int)dr4[3] - 1;
-
-					foreach (DataTable item in dataSet.Tables)
-					{
-						dataAdapter.Update(dataSet, item.TableName);
-					}
-
+					dataAdapterGoods.Update(dataSet, "Goods");
+					
 					mySqlTransaction.Commit();
 				}
 			}
 			catch (Exception ex)
 			{
 				MessageBox.Show(ex.Message);
+			}
+			finally
+			{
+				sqlConnection?.Close();
 			}
 		}
 	}
